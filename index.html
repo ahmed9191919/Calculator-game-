@@ -1,15 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Math Challenge - Infinite Rounds</title>
 <style>
   body {
     font-family: Arial, sans-serif;
     background: linear-gradient(to right, #ffecd2, #fcb69f);
     text-align: center;
-    margin: 0;
-    padding: 0;
+    margin: 0; padding: 0;
   }
   h1 { color: #333; }
   .question { font-size: 2em; margin: 20px 0; }
@@ -34,6 +33,10 @@
     border: none; background: #333; color: white; border-radius: 5px;
     cursor: pointer;
   }
+  #timer {
+    margin-top: 15px;
+    font-size: 1.1em;
+  }
 </style>
 </head>
 <body>
@@ -41,8 +44,8 @@
 <div id="menu">
   <h1>Math Challenge 🔢</h1>
   <p>Enter your name to start:</p>
-  <input type="text" id="playerName" placeholder="Your name">
-  <br>
+  <input type="text" id="playerName" placeholder="Your name" />
+  <br />
   <button onclick="startGame()">Start Game</button>
 </div>
 
@@ -65,12 +68,16 @@
 <audio id="wrongSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_7d0e4b318f.mp3?filename=error-126627.mp3"></audio>
 
 <script>
-let score = 0, player = "", startTime, fastestTime = Infinity;
+let score = 0;
+let player = "";
+let startTime;
+let fastestTime = Infinity;
+
 let scoreboard = JSON.parse(localStorage.getItem("scoreboard")) || [];
 let timeboard = JSON.parse(localStorage.getItem("timeboard")) || [];
 
 function startGame() {
-  let nameInput = document.getElementById("playerName").value.trim();
+  const nameInput = document.getElementById("playerName").value.trim();
   if (!nameInput) return alert("Please enter your name!");
   player = nameInput;
   score = 0;
@@ -111,6 +118,7 @@ function generateQuestion() {
   });
 
   startTime = performance.now();
+  document.getElementById("timer").textContent = "⏱ Time: 0.00s";
 }
 
 function checkAnswer(selected, correct) {
@@ -125,6 +133,7 @@ function checkAnswer(selected, correct) {
   } else {
     document.getElementById("wrongSound").play();
     saveScores();
+    alert(`Game Over!\nYour score: ${score}\nFastest answer time: ${fastestTime === Infinity ? "N/A" : fastestTime + "s"}`);
     showLeaderboards();
   }
 }
@@ -147,8 +156,10 @@ function saveScores() {
 function showLeaderboards() {
   document.getElementById("game").style.display = "none";
   document.getElementById("leaderboards").style.display = "block";
+
   let scoreList = document.getElementById("scoreboard");
   let timeList = document.getElementById("timeboard");
+
   scoreList.innerHTML = "";
   timeList.innerHTML = "";
 
