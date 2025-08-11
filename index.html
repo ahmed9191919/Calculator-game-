@@ -11,121 +11,93 @@
     margin: 0;
     padding: 0;
   }
-  h1 {
-    color: #333;
+  h1 { color: #333; }
+  .question { font-size: 2em; margin: 20px 0; }
+  .options button {
+    display: block; margin: 10px auto; padding: 10px 20px;
+    font-size: 1.2em; background: #fff; border: 2px solid #333;
+    border-radius: 8px; cursor: pointer; transition: 0.2s;
   }
-  .hidden {
-    display: none;
-  }
-  button {
-    margin: 10px;
-    padding: 10px 20px;
-    font-size: 1.2em;
-    background: #fff;
-    border: 2px solid #333;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: 0.2s;
-  }
-  button:hover {
-    background: #333;
-    color: #fff;
-  }
-  .question {
-    font-size: 2em;
-    margin: 20px 0;
-  }
+  .options button:hover { background: #333; color: #fff; }
   .leaderboard {
-    margin-top: 20px;
-    background: #fff;
-    padding: 15px;
-    border-radius: 10px;
-    max-width: 300px;
-    margin-left: auto;
-    margin-right: auto;
+    margin-top: 30px; background: #fff; padding: 15px;
+    border-radius: 10px; max-width: 300px; margin-left: auto; margin-right: auto;
   }
-  .leaderboard h2 {
-    margin-top: 0;
+  .leaderboard h2 { margin-top: 0; }
+  #game, #leaderboards { display: none; }
+  #menu input {
+    padding: 10px; font-size: 1em; margin-top: 10px; border-radius: 5px;
+    border: 2px solid #333;
+  }
+  #menu button {
+    padding: 10px 20px; font-size: 1em; margin-top: 10px;
+    border: none; background: #333; color: white; border-radius: 5px;
+    cursor: pointer;
   }
 </style>
 </head>
 <body>
 
-<!-- Main Menu -->
 <div id="menu">
   <h1>Math Challenge 🔢</h1>
-  <button onclick="startGame()">▶ Play</button>
-  <button onclick="showLeaderboards()">🏆 View Leaderboards</button>
+  <p>Enter your name to start:</p>
+  <input type="text" id="playerName" placeholder="Your name">
+  <br>
+  <button onclick="startGame()">Start Game</button>
 </div>
 
-<!-- Game Screen -->
-<div id="game" class="hidden">
+<div id="game">
+  <h1>Math Challenge 🔢</h1>
   <div class="question" id="question"></div>
   <div class="options" id="options"></div>
+  <div id="timer">⏱ Time: 0.00s</div>
 </div>
 
-<!-- Leaderboards Screen -->
-<div id="leaderboards" class="hidden">
-  <div class="leaderboard">
-    <h2>Highest Scores</h2>
-    <ol id="score-leaderboard"></ol>
-  </div>
-  <div class="leaderboard">
-    <h2>Fastest Times (seconds)</h2>
-    <ol id="time-leaderboard"></ol>
-  </div>
-  <button onclick="backToMenu()">⬅ Back</button>
+<div id="leaderboards" class="leaderboard">
+  <h2>🏆 Highest Scores</h2>
+  <ol id="scoreboard"></ol>
+  <h2>⚡ Fastest Times</h2>
+  <ol id="timeboard"></ol>
+  <button onclick="backToMenu()">Back to Menu</button>
 </div>
 
-<!-- Sounds -->
-<audio id="sound-correct" src="https://cdn.pixabay.com/audio/2022/03/15/audio_8f4d5c82f6.mp3"></audio>
-<audio id="sound-wrong" src="https://cdn.pixabay.com/audio/2022/03/15/audio_ba4f903aac.mp3"></audio>
-<audio id="sound-click" src="https://cdn.pixabay.com/audio/2022/03/15/audio_d4c7c25e88.mp3"></audio>
+<audio id="correctSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_bf0b93e37b.mp3?filename=correct-2-46134.mp3"></audio>
+<audio id="wrongSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_7d0e4b318f.mp3?filename=error-126627.mp3"></audio>
 
 <script>
-let score = 0;
-let startTime;
-let fastestTimes = JSON.parse(localStorage.getItem("fastestTimes")) || [];
-let highScores = JSON.parse(localStorage.getItem("highScores")) || [];
+let score = 0, player = "", startTime, fastestTime = Infinity;
+let scoreboard = JSON.parse(localStorage.getItem("scoreboard")) || [];
+let timeboard = JSON.parse(localStorage.getItem("timeboard")) || [];
 
-// UI control
 function startGame() {
-  document.getElementById("menu").classList.add("hidden");
-  document.getElementById("leaderboards").classList.add("hidden");
-  document.getElementById("game").classList.remove("hidden");
+  let nameInput = document.getElementById("playerName").value.trim();
+  if (!nameInput) return alert("Please enter your name!");
+  player = nameInput;
   score = 0;
+  fastestTime = Infinity;
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("leaderboards").style.display = "none";
+  document.getElementById("game").style.display = "block";
   generateQuestion();
 }
 
-function showLeaderboards() {
-  updateLeaderboards();
-  document.getElementById("menu").classList.add("hidden");
-  document.getElementById("game").classList.add("hidden");
-  document.getElementById("leaderboards").classList.remove("hidden");
-}
-
-function backToMenu() {
-  document.getElementById("leaderboards").classList.add("hidden");
-  document.getElementById("game").classList.add("hidden");
-  document.getElementById("menu").classList.remove("hidden");
-}
-
-// Game logic
 function generateQuestion() {
   let num1 = Math.floor(Math.random() * (10 + score)) + 1;
   let num2 = Math.floor(Math.random() * (10 + score)) + 1;
   let answer = num1 + num2;
-
   document.getElementById("question").textContent = `${num1} + ${num2} = ?`;
 
   let options = [];
   let correctPos = Math.floor(Math.random() * 4);
-
   for (let i = 0; i < 4; i++) {
     if (i === correctPos) {
       options.push(answer);
     } else {
-      options.push(answer + Math.floor(Math.random() * 10) - 5);
+      let wrong;
+      do {
+        wrong = answer + Math.floor(Math.random() * 10) - 5;
+      } while (wrong === answer);
+      options.push(wrong);
     }
   }
 
@@ -138,52 +110,64 @@ function generateQuestion() {
     optionsDiv.appendChild(btn);
   });
 
-  startTime = Date.now();
+  startTime = performance.now();
 }
 
 function checkAnswer(selected, correct) {
-  document.getElementById("sound-click").play();
-  let timeTaken = ((Date.now() - startTime) / 1000).toFixed(2);
+  let timeTaken = ((performance.now() - startTime) / 1000).toFixed(2);
+  document.getElementById("timer").textContent = `⏱ Time: ${timeTaken}s`;
 
   if (selected === correct) {
-    document.getElementById("sound-correct").play();
+    document.getElementById("correctSound").play();
     score++;
-    fastestTimes.push({ name: "Player", time: parseFloat(timeTaken) });
-    fastestTimes.sort((a, b) => a.time - b.time);
-    fastestTimes = fastestTimes.slice(0, 5);
-    localStorage.setItem("fastestTimes", JSON.stringify(fastestTimes));
+    if (timeTaken < fastestTime) fastestTime = timeTaken;
     generateQuestion();
   } else {
-    document.getElementById("sound-wrong").play();
-    let name = prompt(`Game Over! Your score: ${score}\nEnter your name:`);
-    if (name) {
-      highScores.push({ name, score });
-      highScores.sort((a, b) => b.score - a.score);
-      highScores = highScores.slice(0, 5);
-      localStorage.setItem("highScores", JSON.stringify(highScores));
-    }
-    backToMenu();
+    document.getElementById("wrongSound").play();
+    saveScores();
+    showLeaderboards();
   }
 }
 
-// Leaderboard update
-function updateLeaderboards() {
-  let scoreList = document.getElementById("score-leaderboard");
-  let timeList = document.getElementById("time-leaderboard");
+function saveScores() {
+  scoreboard.push({ name: player, score });
+  scoreboard.sort((a, b) => b.score - a.score);
+  scoreboard = scoreboard.slice(0, 5);
 
+  if (fastestTime < Infinity) {
+    timeboard.push({ name: player, time: parseFloat(fastestTime) });
+    timeboard.sort((a, b) => a.time - b.time);
+    timeboard = timeboard.slice(0, 5);
+  }
+
+  localStorage.setItem("scoreboard", JSON.stringify(scoreboard));
+  localStorage.setItem("timeboard", JSON.stringify(timeboard));
+}
+
+function showLeaderboards() {
+  document.getElementById("game").style.display = "none";
+  document.getElementById("leaderboards").style.display = "block";
+  let scoreList = document.getElementById("scoreboard");
+  let timeList = document.getElementById("timeboard");
   scoreList.innerHTML = "";
-  highScores.forEach(entry => {
+  timeList.innerHTML = "";
+
+  scoreboard.forEach(s => {
     let li = document.createElement("li");
-    li.textContent = `${entry.name}: ${entry.score}`;
+    li.textContent = `${s.name}: ${s.score}`;
     scoreList.appendChild(li);
   });
 
-  timeList.innerHTML = "";
-  fastestTimes.forEach(entry => {
+  timeboard.forEach(t => {
     let li = document.createElement("li");
-    li.textContent = `${entry.name}: ${entry.time}s`;
+    li.textContent = `${t.name}: ${t.time}s`;
     timeList.appendChild(li);
   });
+}
+
+function backToMenu() {
+  document.getElementById("leaderboards").style.display = "none";
+  document.getElementById("menu").style.display = "block";
 }
 </script>
 
