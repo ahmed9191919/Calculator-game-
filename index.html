@@ -2,123 +2,189 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calculator Quiz Game</title>
+<title>Math Challenge - Infinite Rounds</title>
 <style>
   body {
-    background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);
     font-family: Arial, sans-serif;
-    color: white;
+    background: linear-gradient(to right, #ffecd2, #fcb69f);
     text-align: center;
-    padding: 20px;
+    margin: 0;
+    padding: 0;
   }
-  h1 { animation: fadeIn 1s ease; }
-  .question {
-    font-size: 2em;
-    margin: 20px;
-    animation: pop 0.3s ease;
+  h1 {
+    color: #333;
   }
-  .options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    max-width: 300px;
-    margin: auto;
+  .hidden {
+    display: none;
   }
   button {
-    padding: 10px;
+    margin: 10px;
+    padding: 10px 20px;
     font-size: 1.2em;
-    border: none;
-    border-radius: 10px;
-    background: #3498db;
-    color: white;
+    background: #fff;
+    border: 2px solid #333;
+    border-radius: 8px;
     cursor: pointer;
     transition: 0.2s;
   }
-  button:hover { background: #2980b9; transform: scale(1.05); }
-  .score { font-size: 1.5em; margin-top: 20px; }
-  @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  button:hover {
+    background: #333;
+    color: #fff;
+  }
+  .question {
+    font-size: 2em;
+    margin: 20px 0;
+  }
+  .leaderboard {
+    margin-top: 20px;
+    background: #fff;
+    padding: 15px;
+    border-radius: 10px;
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .leaderboard h2 {
+    margin-top: 0;
+  }
 </style>
 </head>
 <body>
 
-<h1>🧮 Calculator Quiz</h1>
-<div id="game">
-  <div class="question" id="question"></div>
-  <div class="options" id="options"></div>
-  <div class="score" id="score"></div>
+<!-- Main Menu -->
+<div id="menu">
+  <h1>Math Challenge 🔢</h1>
+  <button onclick="startGame()">▶ Play</button>
+  <button onclick="showLeaderboards()">🏆 View Leaderboards</button>
 </div>
 
-<audio id="correctSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
-<audio id="wrongSound" src="https://www.soundjay.com/button/beep-10.wav"></audio>
+<!-- Game Screen -->
+<div id="game" class="hidden">
+  <div class="question" id="question"></div>
+  <div class="options" id="options"></div>
+</div>
+
+<!-- Leaderboards Screen -->
+<div id="leaderboards" class="hidden">
+  <div class="leaderboard">
+    <h2>Highest Scores</h2>
+    <ol id="score-leaderboard"></ol>
+  </div>
+  <div class="leaderboard">
+    <h2>Fastest Times (seconds)</h2>
+    <ol id="time-leaderboard"></ol>
+  </div>
+  <button onclick="backToMenu()">⬅ Back</button>
+</div>
+
+<!-- Sounds -->
+<audio id="sound-correct" src="https://cdn.pixabay.com/audio/2022/03/15/audio_8f4d5c82f6.mp3"></audio>
+<audio id="sound-wrong" src="https://cdn.pixabay.com/audio/2022/03/15/audio_ba4f903aac.mp3"></audio>
+<audio id="sound-click" src="https://cdn.pixabay.com/audio/2022/03/15/audio_d4c7c25e88.mp3"></audio>
 
 <script>
-let round = 1;
 let score = 0;
-const totalRounds = 10;
+let startTime;
+let fastestTimes = JSON.parse(localStorage.getItem("fastestTimes")) || [];
+let highScores = JSON.parse(localStorage.getItem("highScores")) || [];
 
-function generateQuestion(level) {
-  let num1, num2, answer;
-  let ops = ["+", "-", "*", "/"];
-  let op = ops[Math.floor(Math.random() * (level < 5 ? 2 : level < 8 ? 3 : 4))];
-  
-  if (op === "+") {
-    num1 = Math.floor(Math.random() * (level * 10)) + 1;
-    num2 = Math.floor(Math.random() * (level * 10)) + 1;
-    answer = num1 + num2;
-  } else if (op === "-") {
-    num1 = Math.floor(Math.random() * (level * 10)) + 5;
-    num2 = Math.floor(Math.random() * (level * 10)) + 1;
-    answer = num1 - num2;
-  } else if (op === "*") {
-    num1 = Math.floor(Math.random() * level) + 2;
-    num2 = Math.floor(Math.random() * level) + 2;
-    answer = num1 * num2;
-  } else if (op === "/") {
-    num2 = Math.floor(Math.random() * level) + 1;
-    answer = Math.floor(Math.random() * level) + 2;
-    num1 = num2 * answer;
-  }
-  
-  let options = [answer];
-  while (options.length < 4) {
-    let wrong = answer + Math.floor(Math.random() * 10) - 5;
-    if (!options.includes(wrong) && wrong >= 0) options.push(wrong);
-  }
-  options.sort(() => Math.random() - 0.5);
-  
-  return { question: `${num1} ${op} ${num2} = ?`, answer, options };
+// UI control
+function startGame() {
+  document.getElementById("menu").classList.add("hidden");
+  document.getElementById("leaderboards").classList.add("hidden");
+  document.getElementById("game").classList.remove("hidden");
+  score = 0;
+  generateQuestion();
 }
 
-function showQuestion() {
-  if (round > totalRounds) {
-    document.getElementById("game").innerHTML = `<h2>🎉 Game Over!</h2><p>Your Score: ${score}/${totalRounds}</p>`;
-    return;
+function showLeaderboards() {
+  updateLeaderboards();
+  document.getElementById("menu").classList.add("hidden");
+  document.getElementById("game").classList.add("hidden");
+  document.getElementById("leaderboards").classList.remove("hidden");
+}
+
+function backToMenu() {
+  document.getElementById("leaderboards").classList.add("hidden");
+  document.getElementById("game").classList.add("hidden");
+  document.getElementById("menu").classList.remove("hidden");
+}
+
+// Game logic
+function generateQuestion() {
+  let num1 = Math.floor(Math.random() * (10 + score)) + 1;
+  let num2 = Math.floor(Math.random() * (10 + score)) + 1;
+  let answer = num1 + num2;
+
+  document.getElementById("question").textContent = `${num1} + ${num2} = ?`;
+
+  let options = [];
+  let correctPos = Math.floor(Math.random() * 4);
+
+  for (let i = 0; i < 4; i++) {
+    if (i === correctPos) {
+      options.push(answer);
+    } else {
+      options.push(answer + Math.floor(Math.random() * 10) - 5);
+    }
   }
-  let q = generateQuestion(round);
-  document.getElementById("question").innerText = `Round ${round}: ${q.question}`;
-  let optsDiv = document.getElementById("options");
-  optsDiv.innerHTML = "";
-  q.options.forEach(opt => {
+
+  let optionsDiv = document.getElementById("options");
+  optionsDiv.innerHTML = "";
+  options.forEach(opt => {
     let btn = document.createElement("button");
-    btn.innerText = opt;
-    btn.onclick = () => {
-      if (opt === q.answer) {
-        score++;
-        document.getElementById("correctSound").play();
-      } else {
-        document.getElementById("wrongSound").play();
-      }
-      round++;
-      setTimeout(showQuestion, 500);
-    };
-    optsDiv.appendChild(btn);
+    btn.textContent = opt;
+    btn.onclick = () => checkAnswer(opt, answer);
+    optionsDiv.appendChild(btn);
   });
-  document.getElementById("score").innerText = `Score: ${score}`;
+
+  startTime = Date.now();
 }
 
-showQuestion();
+function checkAnswer(selected, correct) {
+  document.getElementById("sound-click").play();
+  let timeTaken = ((Date.now() - startTime) / 1000).toFixed(2);
+
+  if (selected === correct) {
+    document.getElementById("sound-correct").play();
+    score++;
+    fastestTimes.push({ name: "Player", time: parseFloat(timeTaken) });
+    fastestTimes.sort((a, b) => a.time - b.time);
+    fastestTimes = fastestTimes.slice(0, 5);
+    localStorage.setItem("fastestTimes", JSON.stringify(fastestTimes));
+    generateQuestion();
+  } else {
+    document.getElementById("sound-wrong").play();
+    let name = prompt(`Game Over! Your score: ${score}\nEnter your name:`);
+    if (name) {
+      highScores.push({ name, score });
+      highScores.sort((a, b) => b.score - a.score);
+      highScores = highScores.slice(0, 5);
+      localStorage.setItem("highScores", JSON.stringify(highScores));
+    }
+    backToMenu();
+  }
+}
+
+// Leaderboard update
+function updateLeaderboards() {
+  let scoreList = document.getElementById("score-leaderboard");
+  let timeList = document.getElementById("time-leaderboard");
+
+  scoreList.innerHTML = "";
+  highScores.forEach(entry => {
+    let li = document.createElement("li");
+    li.textContent = `${entry.name}: ${entry.score}`;
+    scoreList.appendChild(li);
+  });
+
+  timeList.innerHTML = "";
+  fastestTimes.forEach(entry => {
+    let li = document.createElement("li");
+    li.textContent = `${entry.name}: ${entry.time}s`;
+    timeList.appendChild(li);
+  });
+}
 </script>
 
 </body>
