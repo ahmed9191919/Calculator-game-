@@ -1,99 +1,224 @@
-using UnityEngine;
-using UnityEngine.AI;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ultimate Math Challenge</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(to right, #ffecd2, #fcb69f);
+    text-align: center;
+    margin: 0;
+    padding: 0;
+  }
+  h1 {
+    color: #333;
+  }
+  .hidden {
+    display: none;
+  }
+  button {
+    padding: 10px 20px;
+    font-size: 1.2em;
+    margin: 5px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #333;
+    color: white;
+    transition: 0.2s;
+  }
+  button:hover {
+    background: #555;
+  }
+  input {
+    padding: 10px;
+    font-size: 1.2em;
+    border: 2px solid #333;
+    border-radius: 8px;
+  }
+  .question {
+    font-size: 2em;
+    margin: 20px 0;
+    animation: fadeIn 0.5s;
+  }
+  .options button {
+    display: block;
+    margin: 10px auto;
+    background: white;
+    color: black;
+    border: 2px solid #333;
+  }
+  .options button:hover {
+    background: #333;
+    color: white;
+  }
+  .leaderboard {
+    margin-top: 30px;
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .leaderboard h2 {
+    margin-top: 0;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
 
-public class SurvivalGameManager : MonoBehaviour
-{
-    // ===== WORLD GENERATION =====
-    [Header("World Settings")]
-    public int size = 512;
-    public float heightScale = 20f;
-    public float detailScale = 25f;
-    public Terrain terrain;
+<!-- Main Menu -->
+<div id="menu-screen">
+  <h1>🏆 Ultimate Math Challenge</h1>
+  <p>Enter your name to start:</p>
+  <input type="text" id="playerName" placeholder="Your name">
+  <br><br>
+  <button onclick="startGame()">Start Game</button>
+</div>
 
-    // ===== PLAYER STATS =====
-    [Header("Player Stats")]
-    public Transform player;
-    public float health = 100f;
-    public float hunger = 100f;
-    public float hungerDecreaseRate = 0.1f;
+<!-- Game Screen -->
+<div id="game-screen" class="hidden">
+  <h1>Math Challenge 🔢</h1>
+  <div class="question" id="question"></div>
+  <div class="options" id="options"></div>
+  <p>Score: <span id="score">0</span></p>
+</div>
 
-    // ===== BOSS SETTINGS =====
-    [Header("Boss Settings")]
-    public float bossHealth = 500f;
-    public NavMeshAgent bossAgent;
-    public Transform bossTarget;
-    public GameObject bossDeathDrop;
+<!-- Leaderboard Screen -->
+<div id="leaderboard-screen" class="hidden">
+  <h1>Game Over!</h1>
+  <p>Your score: <span id="final-score"></span></p>
+  <p>Your average time: <span id="final-time"></span> sec</p>
+  <div class="leaderboard">
+    <h2>🏆 Top Scores</h2>
+    <ol id="score-leaderboard"></ol>
+  </div>
+  <div class="leaderboard">
+    <h2>⏱ Fastest Players</h2>
+    <ol id="time-leaderboard"></ol>
+  </div>
+  <button onclick="goToMenu()">Main Menu</button>
+</div>
 
-    void Start()
-    {
-        // Generate world terrain
-        if (terrain != null)
-            terrain.terrainData = GenerateTerrain(terrain.terrainData);
-    }
+<script>
+let playerName = "";
+let score = 0;
+let leaderboard = JSON.parse(localStorage.getItem("worldLeaderboard")) || [];
+let timeLeaderboard = JSON.parse(localStorage.getItem("timeLeaderboard")) || [];
+let startTime, questionStartTime, totalTime = 0;
 
-    void Update()
-    {
-        HandlePlayerSurvival();
-        HandleBossAI();
-    }
+// Sounds
+const correctSound = new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_5db3b0c9d1.mp3?filename=correct-2-46134.mp3");
+const wrongSound = new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_5f17a46a1d.mp3?filename=error-2-46134.mp3");
 
-    // ====== WORLD GENERATION ======
-    TerrainData GenerateTerrain(TerrainData terrainData)
-    {
-        terrainData.heightmapResolution = size + 1;
-        terrainData.size = new Vector3(size, heightScale, size);
-        terrainData.SetHeights(0, 0, GenerateHeights());
-        return terrainData;
-    }
-
-    float[,] GenerateHeights()
-    {
-        float[,] heights = new float[size, size];
-        for (int x = 0; x < size; x++)
-        {
-            for (int y = 0; y < size; y++)
-            {
-                float xCoord = (float)x / size * detailScale;
-                float yCoord = (float)y / size * detailScale;
-                heights[x, y] = Mathf.PerlinNoise(xCoord, yCoord);
-            }
-        }
-        return heights;
-    }
-
-    // ====== PLAYER SURVIVAL ======
-    void HandlePlayerSurvival()
-    {
-        hunger -= hungerDecreaseRate * Time.deltaTime;
-        hunger = Mathf.Clamp(hunger, 0, 100);
-
-        if (hunger <= 0)
-            health -= 0.2f * Time.deltaTime;
-
-        if (health <= 0)
-            Debug.Log("Player has died!");
-    }
-
-    // ====== BOSS AI ======
-    void HandleBossAI()
-    {
-        if (bossAgent != null && bossTarget != null)
-            bossAgent.SetDestination(bossTarget.position);
-    }
-
-    public void DamageBoss(float damage)
-    {
-        bossHealth -= damage;
-        if (bossHealth <= 0)
-            BossDies();
-    }
-
-    void BossDies()
-    {
-        if (bossDeathDrop != null)
-            Instantiate(bossDeathDrop, bossAgent.transform.position, Quaternion.identity);
-
-        Destroy(bossAgent.gameObject);
-        Debug.Log("Boss Defeated!");
-    }
+function startGame() {
+  playerName = document.getElementById("playerName").value.trim();
+  if (!playerName) {
+    alert("Please enter your name!");
+    return;
+  }
+  score = 0;
+  totalTime = 0;
+  startTime = Date.now();
+  document.getElementById("menu-screen").classList.add("hidden");
+  document.getElementById("game-screen").classList.remove("hidden");
+  generateQuestion();
 }
+
+function generateQuestion() {
+  questionStartTime = Date.now();
+  let num1 = Math.floor(Math.random() * (10 + score)) + 1;
+  let num2 = Math.floor(Math.random() * (10 + score)) + 1;
+  let answer = num1 + num2;
+
+  document.getElementById("question").textContent = `${num1} + ${num2} = ?`;
+
+  let options = [];
+  let correctPos = Math.floor(Math.random() * 4);
+
+  for (let i = 0; i < 4; i++) {
+    if (i === correctPos) {
+      options.push(answer);
+    } else {
+      options.push(answer + Math.floor(Math.random() * 10) - 5);
+    }
+  }
+
+  let optionsDiv = document.getElementById("options");
+  optionsDiv.innerHTML = "";
+  options.forEach(opt => {
+    let btn = document.createElement("button");
+    btn.textContent = opt;
+    btn.onclick = () => checkAnswer(opt, answer);
+    optionsDiv.appendChild(btn);
+  });
+}
+
+function checkAnswer(selected, correct) {
+  let timeTaken = (Date.now() - questionStartTime) / 1000;
+  totalTime += timeTaken;
+
+  if (selected === correct) {
+    score++;
+    document.getElementById("score").textContent = score;
+    correctSound.play();
+    generateQuestion();
+  } else {
+    wrongSound.play();
+    endGame();
+  }
+}
+
+function endGame() {
+  document.getElementById("game-screen").classList.add("hidden");
+  document.getElementById("leaderboard-screen").classList.remove("hidden");
+
+  let avgTime = (totalTime / (score || 1)).toFixed(2);
+  document.getElementById("final-score").textContent = score;
+  document.getElementById("final-time").textContent = avgTime;
+
+  leaderboard.push({ name: playerName, score });
+  leaderboard.sort((a, b) => b.score - a.score);
+  leaderboard = leaderboard.slice(0, 5);
+  localStorage.setItem("worldLeaderboard", JSON.stringify(leaderboard));
+
+  timeLeaderboard.push({ name: playerName, avgTime: parseFloat(avgTime) });
+  timeLeaderboard.sort((a, b) => a.avgTime - b.avgTime);
+  timeLeaderboard = timeLeaderboard.slice(0, 5);
+  localStorage.setItem("timeLeaderboard", JSON.stringify(timeLeaderboard));
+
+  updateLeaderboards();
+}
+
+function updateLeaderboards() {
+  let scoreList = document.getElementById("score-leaderboard");
+  scoreList.innerHTML = "";
+  leaderboard.forEach(entry => {
+    let li = document.createElement("li");
+    li.textContent = `${entry.name}: ${entry.score}`;
+    scoreList.appendChild(li);
+  });
+
+  let timeList = document.getElementById("time-leaderboard");
+  timeList.innerHTML = "";
+  timeLeaderboard.forEach(entry => {
+    let li = document.createElement("li");
+    li.textContent = `${entry.name}: ${entry.avgTime}s`;
+    timeList.appendChild(li);
+  });
+}
+
+function goToMenu() {
+  document.getElementById("leaderboard-screen").classList.add("hidden");
+  document.getElementById("menu-screen").classList.remove("hidden");
+}
+</script>
+
+</body>
+</html>
