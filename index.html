@@ -1,186 +1,99 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<title>Math Challenge - Infinite Rounds</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    background: linear-gradient(to right, #ffecd2, #fcb69f);
-    text-align: center;
-    margin: 0; padding: 0;
-  }
-  h1 { color: #333; }
-  .question { font-size: 2em; margin: 20px 0; }
-  .options button {
-    display: block; margin: 10px auto; padding: 10px 20px;
-    font-size: 1.2em; background: #fff; border: 2px solid #333;
-    border-radius: 8px; cursor: pointer; transition: 0.2s;
-  }
-  .options button:hover { background: #333; color: #fff; }
-  .leaderboard {
-    margin-top: 30px; background: #fff; padding: 15px;
-    border-radius: 10px; max-width: 300px; margin-left: auto; margin-right: auto;
-  }
-  .leaderboard h2 { margin-top: 0; }
-  #game, #leaderboards { display: none; }
-  #menu input {
-    padding: 10px; font-size: 1em; margin-top: 10px; border-radius: 5px;
-    border: 2px solid #333;
-  }
-  #menu button {
-    padding: 10px 20px; font-size: 1em; margin-top: 10px;
-    border: none; background: #333; color: white; border-radius: 5px;
-    cursor: pointer;
-  }
-  #timer {
-    margin-top: 15px;
-    font-size: 1.1em;
-  }
-</style>
-</head>
-<body>
+using UnityEngine;
+using UnityEngine.AI;
 
-<div id="menu">
-  <h1>Math Challenge 🔢</h1>
-  <p>Enter your name to start:</p>
-  <input type="text" id="playerName" placeholder="Your name" />
-  <br />
-  <button onclick="startGame()">Start Game</button>
-</div>
+public class SurvivalGameManager : MonoBehaviour
+{
+    // ===== WORLD GENERATION =====
+    [Header("World Settings")]
+    public int size = 512;
+    public float heightScale = 20f;
+    public float detailScale = 25f;
+    public Terrain terrain;
 
-<div id="game">
-  <h1>Math Challenge 🔢</h1>
-  <div class="question" id="question"></div>
-  <div class="options" id="options"></div>
-  <div id="timer">⏱ Time: 0.00s</div>
-</div>
+    // ===== PLAYER STATS =====
+    [Header("Player Stats")]
+    public Transform player;
+    public float health = 100f;
+    public float hunger = 100f;
+    public float hungerDecreaseRate = 0.1f;
 
-<div id="leaderboards" class="leaderboard">
-  <h2>🏆 Highest Scores</h2>
-  <ol id="scoreboard"></ol>
-  <h2>⚡ Fastest Times</h2>
-  <ol id="timeboard"></ol>
-  <button onclick="backToMenu()">Back to Menu</button>
-</div>
+    // ===== BOSS SETTINGS =====
+    [Header("Boss Settings")]
+    public float bossHealth = 500f;
+    public NavMeshAgent bossAgent;
+    public Transform bossTarget;
+    public GameObject bossDeathDrop;
 
-<audio id="correctSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_bf0b93e37b.mp3?filename=correct-2-46134.mp3"></audio>
-<audio id="wrongSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_7d0e4b318f.mp3?filename=error-126627.mp3"></audio>
-
-<script>
-let score = 0;
-let player = "";
-let startTime;
-let fastestTime = Infinity;
-
-let scoreboard = JSON.parse(localStorage.getItem("scoreboard")) || [];
-let timeboard = JSON.parse(localStorage.getItem("timeboard")) || [];
-
-function startGame() {
-  const nameInput = document.getElementById("playerName").value.trim();
-  if (!nameInput) return alert("Please enter your name!");
-  player = nameInput;
-  score = 0;
-  fastestTime = Infinity;
-  document.getElementById("menu").style.display = "none";
-  document.getElementById("leaderboards").style.display = "none";
-  document.getElementById("game").style.display = "block";
-  generateQuestion();
-}
-
-function generateQuestion() {
-  let num1 = Math.floor(Math.random() * (10 + score)) + 1;
-  let num2 = Math.floor(Math.random() * (10 + score)) + 1;
-  let answer = num1 + num2;
-  document.getElementById("question").textContent = `${num1} + ${num2} = ?`;
-
-  let options = [];
-  let correctPos = Math.floor(Math.random() * 4);
-  for (let i = 0; i < 4; i++) {
-    if (i === correctPos) {
-      options.push(answer);
-    } else {
-      let wrong;
-      do {
-        wrong = answer + Math.floor(Math.random() * 10) - 5;
-      } while (wrong === answer);
-      options.push(wrong);
+    void Start()
+    {
+        // Generate world terrain
+        if (terrain != null)
+            terrain.terrainData = GenerateTerrain(terrain.terrainData);
     }
-  }
 
-  let optionsDiv = document.getElementById("options");
-  optionsDiv.innerHTML = "";
-  options.forEach(opt => {
-    let btn = document.createElement("button");
-    btn.textContent = opt;
-    btn.onclick = () => checkAnswer(opt, answer);
-    optionsDiv.appendChild(btn);
-  });
+    void Update()
+    {
+        HandlePlayerSurvival();
+        HandleBossAI();
+    }
 
-  startTime = performance.now();
-  document.getElementById("timer").textContent = "⏱ Time: 0.00s";
+    // ====== WORLD GENERATION ======
+    TerrainData GenerateTerrain(TerrainData terrainData)
+    {
+        terrainData.heightmapResolution = size + 1;
+        terrainData.size = new Vector3(size, heightScale, size);
+        terrainData.SetHeights(0, 0, GenerateHeights());
+        return terrainData;
+    }
+
+    float[,] GenerateHeights()
+    {
+        float[,] heights = new float[size, size];
+        for (int x = 0; x < size; x++)
+        {
+            for (int y = 0; y < size; y++)
+            {
+                float xCoord = (float)x / size * detailScale;
+                float yCoord = (float)y / size * detailScale;
+                heights[x, y] = Mathf.PerlinNoise(xCoord, yCoord);
+            }
+        }
+        return heights;
+    }
+
+    // ====== PLAYER SURVIVAL ======
+    void HandlePlayerSurvival()
+    {
+        hunger -= hungerDecreaseRate * Time.deltaTime;
+        hunger = Mathf.Clamp(hunger, 0, 100);
+
+        if (hunger <= 0)
+            health -= 0.2f * Time.deltaTime;
+
+        if (health <= 0)
+            Debug.Log("Player has died!");
+    }
+
+    // ====== BOSS AI ======
+    void HandleBossAI()
+    {
+        if (bossAgent != null && bossTarget != null)
+            bossAgent.SetDestination(bossTarget.position);
+    }
+
+    public void DamageBoss(float damage)
+    {
+        bossHealth -= damage;
+        if (bossHealth <= 0)
+            BossDies();
+    }
+
+    void BossDies()
+    {
+        if (bossDeathDrop != null)
+            Instantiate(bossDeathDrop, bossAgent.transform.position, Quaternion.identity);
+
+        Destroy(bossAgent.gameObject);
+        Debug.Log("Boss Defeated!");
+    }
 }
-
-function checkAnswer(selected, correct) {
-  let timeTaken = ((performance.now() - startTime) / 1000).toFixed(2);
-  document.getElementById("timer").textContent = `⏱ Time: ${timeTaken}s`;
-
-  if (selected === correct) {
-    document.getElementById("correctSound").play();
-    score++;
-    if (timeTaken < fastestTime) fastestTime = timeTaken;
-    generateQuestion();
-  } else {
-    document.getElementById("wrongSound").play();
-    saveScores();
-    alert(`Game Over!\nYour score: ${score}\nFastest answer time: ${fastestTime === Infinity ? "N/A" : fastestTime + "s"}`);
-    showLeaderboards();
-  }
-}
-
-function saveScores() {
-  scoreboard.push({ name: player, score });
-  scoreboard.sort((a, b) => b.score - a.score);
-  scoreboard = scoreboard.slice(0, 5);
-
-  if (fastestTime < Infinity) {
-    timeboard.push({ name: player, time: parseFloat(fastestTime) });
-    timeboard.sort((a, b) => a.time - b.time);
-    timeboard = timeboard.slice(0, 5);
-  }
-
-  localStorage.setItem("scoreboard", JSON.stringify(scoreboard));
-  localStorage.setItem("timeboard", JSON.stringify(timeboard));
-}
-
-function showLeaderboards() {
-  document.getElementById("game").style.display = "none";
-  document.getElementById("leaderboards").style.display = "block";
-
-  let scoreList = document.getElementById("scoreboard");
-  let timeList = document.getElementById("timeboard");
-
-  scoreList.innerHTML = "";
-  timeList.innerHTML = "";
-
-  scoreboard.forEach(s => {
-    let li = document.createElement("li");
-    li.textContent = `${s.name}: ${s.score}`;
-    scoreList.appendChild(li);
-  });
-
-  timeboard.forEach(t => {
-    let li = document.createElement("li");
-    li.textContent = `${t.name}: ${t.time}s`;
-    timeList.appendChild(li);
-  });
-}
-
-function backToMenu() {
-  document.getElementById("leaderboards").style.display = "none";
-  document.getElementById("menu").style.display = "block";
-}
-</script>
-
-</body>
-</html>
